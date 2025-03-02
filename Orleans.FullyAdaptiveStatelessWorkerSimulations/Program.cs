@@ -89,35 +89,6 @@ void RunApp(ArrivalPattern pattern, Dictionary<ArrivalPattern, (double Kp, doubl
     }
 }
 
-double CalculateFitness(double kp, double ki, double kd, List<double> messageArrivalTimes)
-{
-    try
-    {
-        var simulation = new Simulation(workerProcessingTime, simulationDuration, maxWorkers, true, simulationTimeStep, simulationRemovalPeriod, messageArrivalTimes)
-        {
-            Kp = kp,
-            Ki = ki,
-            Kd = kd
-        };
-        simulation.Run();
-
-        double avgWaitingCount = simulation.AvgWaitingCountData.Average(d => d.Value);
-        double avgQueueLength = simulation.QueueLengthData.Average(d => d.Value);
-        double overshoot = Math.Max(0, simulation.QueueLengthData.Max(d => d.Value) - avgQueueLength);
-        double settlingTime = simulation.QueueLengthData.Last().Time;
-
-        double fitness = avgWaitingCount + avgQueueLength + overshoot + settlingTime;
-        Console.WriteLine($"KP: {kp:F3}, KI: {ki:F3}, KD: {kd:F3}, Fitness: {fitness:F3}");
-
-        return fitness;
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"Error in CalculateFitness: {ex.Message}");
-        return double.MaxValue; // Return a high fitness value for invalid parameters
-    }
-}
-
 List<(double Kp, double Ki, double Kd)> TunePIDWithGeneticAlgorithm(List<double> messageArrivalTimes)
 {
     int populationSize = 20;
@@ -195,10 +166,40 @@ List<(double Kp, double Ki, double Kd)> TunePIDWithGeneticAlgorithm(List<double>
     if (bestSolutions.Count == 0)
     {
         Console.WriteLine("No valid solutions found. Returning default PID values.");
-        return [(1.2, 0.4, 0.3)]; // Some random defaults
+        return [(1.2, 0.4, 0.3)]; // Some defaults
     }
 
     return bestSolutions;
+}
+
+double CalculateFitness(double kp, double ki, double kd, List<double> messageArrivalTimes)
+{
+    try
+    {
+        var simulation = new Simulation(workerProcessingTime, simulationDuration, maxWorkers, true, simulationTimeStep, simulationRemovalPeriod, messageArrivalTimes)
+        {
+            Kp = kp,
+            Ki = ki,
+            Kd = kd
+        };
+
+        simulation.Run();
+
+        double avgWaitingCount = simulation.AvgWaitingCountData.Average(d => d.Value);
+        double avgQueueLength = simulation.QueueLengthData.Average(d => d.Value);
+        double overshoot = Math.Max(0, simulation.QueueLengthData.Max(d => d.Value) - avgQueueLength);
+        double settlingTime = simulation.QueueLengthData.Last().Time;
+
+        double fitness = avgWaitingCount + avgQueueLength + overshoot + settlingTime;
+        Console.WriteLine($"KP: {kp:F3}, KI: {ki:F3}, KD: {kd:F3}, Fitness: {fitness:F3}");
+
+        return fitness;
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error in CalculateFitness: {ex.Message}");
+        return double.MaxValue; // We eturn a high fitness value for invalid parameters.
+    }
 }
 
 static List<double> GenerateMessageArrivalTimes(double messageRateSeed, double simulationDuration, ArrivalPattern pattern)
@@ -512,6 +513,9 @@ public class Simulation(double workerProcessingTime, double simulationDuration, 
     public double Ki { get; set; }
     public double Kd { get; set; }
 
+    private double _previousError = 0;
+    private double _integralTerm = 0;
+
     private readonly int _maxWorkers = maxWorkers;
     private readonly int _workerRemovalBackoffMs = 5 * (int)simulationRemovalPeriod;
     private readonly double _workerProcessingTime = workerProcessingTime;
@@ -580,19 +584,16 @@ public class Simulation(double workerProcessingTime, double simulationDuration, 
         return messageCount;
     }
 
-    private double _previousError = 0;
-    private double _integral = 0;
-
     private void TryRemoveWorkers()
     {
         double currentAvgWaitingCount = _workers.Count > 0 ? _workers.Average(w => w.WaitingCount) : 0;
         double error = -1 * currentAvgWaitingCount;
 
-        _integral += error;
+        _integralTerm += error;
         double derivative = error - _previousError;
         _previousError = error;
 
-        double controlSignal = Kp * error + Ki * _integral + Kd * derivative;
+        double controlSignal = Kp * error + Ki * _integralTerm + Kd * derivative;
 
         if ((DateTime.Now - _lastWorkerRemovalTime).TotalMilliseconds > _workerRemovalBackoffMs)
         {
