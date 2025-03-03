@@ -300,40 +300,6 @@ static List<double> GenerateMessageArrivalTimes(double messageRateSeed, double s
             }
             break;
 
-        case ArrivalPattern.Chaotic:
-            {
-                double baseRate = messageRateSeed * 0.1;
-                double burstProbability = 0.1;
-                double burstDuration = 1;
-                int burstMessageCount = (int)(baseRate * burstDuration * 2);
-                double nextTime = 0;
-
-                while (nextTime < simulationDuration)
-                {
-                    double dynamicRate = baseRate;
-                    if (Random.Shared.NextDouble() < burstProbability)
-                    {
-                        dynamicRate = messageRateSeed * Random.Shared.NextDouble() * 2;
-                        for (int i = 0; i < burstMessageCount; i++)
-                        {
-                            arrivalTimes.Add(nextTime + Random.Shared.NextDouble() * burstDuration);
-                        }
-
-                        nextTime += burstDuration;
-                        burstDuration += burstDuration / 2;
-                    }
-                    else
-                    {
-                        nextTime += 1 / dynamicRate;
-                        if (nextTime > 0 && nextTime < simulationDuration)
-                        {
-                            arrivalTimes.Add(nextTime);
-                        }
-                    }
-                }
-            }
-            break;
-
         case ArrivalPattern.SpikeAndDecay:
             {
                 double nextSpikeTime = 0;
@@ -375,6 +341,40 @@ static List<double> GenerateMessageArrivalTimes(double messageRateSeed, double s
                     // Add a random interval before the next spike
                     double nextSpikeInterval = minSpikeInterval + (maxSpikeInterval - minSpikeInterval) * Random.Shared.NextDouble();
                     nextSpikeTime += nextSpikeInterval;
+                }
+            }
+            break;
+
+        case ArrivalPattern.Chaotic:
+            {
+                double baseRate = messageRateSeed * 0.1;
+                double burstProbability = 0.1;
+                double burstDuration = 1;
+                int burstMessageCount = (int)(baseRate * burstDuration * 2);
+                double nextTime = 0;
+
+                while (nextTime < simulationDuration)
+                {
+                    double dynamicRate = baseRate;
+                    if (Random.Shared.NextDouble() < burstProbability)
+                    {
+                        dynamicRate = messageRateSeed * Random.Shared.NextDouble() * 2;
+                        for (int i = 0; i < burstMessageCount; i++)
+                        {
+                            arrivalTimes.Add(nextTime + Random.Shared.NextDouble() * burstDuration);
+                        }
+
+                        nextTime += burstDuration;
+                        burstDuration += burstDuration / 2;
+                    }
+                    else
+                    {
+                        nextTime += 1 / dynamicRate;
+                        if (nextTime > 0 && nextTime < simulationDuration)
+                        {
+                            arrivalTimes.Add(nextTime);
+                        }
+                    }
                 }
             }
             break;
@@ -479,8 +479,8 @@ enum ArrivalPattern
     Periodic,
     Ramp,
     Burst,
-    Chaotic,
     SpikeAndDecay,
+    Chaotic,
     Poisson
 }
 
