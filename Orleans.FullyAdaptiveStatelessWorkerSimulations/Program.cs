@@ -518,14 +518,14 @@ public class Simulation(
 
     private double _previousError = 0;
     private double _integralTerm = 0;
-    private double _timeBelowZero = 0;
+    private int _timesBelowZeroCount = 0;
+    private int _timesBelowZeroMaxCount = 10;
 
     private readonly int _maxWorkers = maxWorkers;
     private readonly int _workerRemovalBackoffMs = 5 * (int)simulationRemovalPeriod;
     private readonly double _workerProcessingTime = workerProcessingTime;
     private readonly double _simulationDuration = simulationDuration;
     private readonly double _simulationTimeStep = simulationTimeStep;
-    private readonly double _timeBelowZeroHysteresis = 10 * simulationTimeStep;
     private readonly double _simulationRemovalPeriod = simulationRemovalPeriod;
 
     private readonly List<Worker> _workers = [];
@@ -604,8 +604,8 @@ public class Simulation(
         {
             if (controlSignal < 0)
             {
-                _timeBelowZero += simulationTimeStep;
-                if (_timeBelowZero > _timeBelowZeroHysteresis)
+                _timesBelowZeroCount++;
+                if (_timesBelowZeroCount > _timesBelowZeroMaxCount)
                 {
                     var workerToRemove = _workers.LastOrDefault(w => w.IsInactive);
                     if (workerToRemove != null)
@@ -614,12 +614,12 @@ public class Simulation(
                         _lastWorkerRemovalTime = DateTime.UtcNow;
                     }
 
-                    _timeBelowZero = 0;
+                    _timesBelowZeroCount = 0;
                 }
             }
             else
             {
-                _timeBelowZero = 0;
+                _timesBelowZeroCount = 0;
             }
         }
     }
