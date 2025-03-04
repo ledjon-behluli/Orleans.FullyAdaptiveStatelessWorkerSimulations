@@ -300,7 +300,7 @@ static List<double> GenerateMessageArrivalTimes(double messageRateSeed, double s
             }
             break;
 
-        case ArrivalPattern.SpikeAndDecay:
+        case ArrivalPattern.Burst:
             {
                 double nextSpikeTime = 0;
                 double baseRate = messageRateSeed * 0.1; // Base message rate between spikes
@@ -479,7 +479,7 @@ enum ArrivalPattern
     Periodic,
     Ramp,
     Spike,
-    SpikeAndDecay,
+    Burst,
     Chaotic,
     Poisson
 }
@@ -497,7 +497,10 @@ public class Worker
     public double FinishTime { get; set; }
 }
 
-public class Simulation(double workerProcessingTime, double simulationDuration, int maxWorkers, bool isDynamic, double simulationTimeStep, double simulationRemovalPeriod, List<double> messageArrivalTimes)
+public class Simulation(
+    double workerProcessingTime, double simulationDuration, 
+    int maxWorkers, bool isDynamic, double simulationTimeStep,
+    double simulationRemovalPeriod, List<double> messageArrivalTimes)
 {
     public List<(double Time, double Value)> WorkerCountData = [];
     public List<(double Time, double Value)> QueueLengthData = [];
