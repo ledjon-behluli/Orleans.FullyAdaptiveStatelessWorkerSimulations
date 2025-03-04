@@ -284,17 +284,17 @@ static List<double> GenerateMessageArrivalTimes(double messageRateSeed, double s
             }
             break;
 
-        case ArrivalPattern.Burst:
+        case ArrivalPattern.Spike:
             {
-                double burstInterval = 10;
-                double burstDuration = 0.05;
-                int burstMessageCount = (int)(messageRateSeed * burstDuration);
+                double spikeInterval = 10;
+                double spikeDuration = 0.05;
+                int spikeMessageCount = (int)(messageRateSeed * spikeDuration);
 
-                for (double time = burstInterval; time < simulationDuration; time += burstInterval)
+                for (double time = spikeInterval; time < simulationDuration; time += spikeInterval)
                 {
-                    for (int i = 0; i < burstMessageCount; i++)
+                    for (int i = 0; i < spikeMessageCount; i++)
                     {
-                        arrivalTimes.Add(time + Random.Shared.NextDouble() * burstDuration);
+                        arrivalTimes.Add(time + Random.Shared.NextDouble() * spikeDuration);
                     }
                 }
             }
@@ -478,7 +478,7 @@ enum ArrivalPattern
     Constant,
     Periodic,
     Ramp,
-    Burst,
+    Spike,
     SpikeAndDecay,
     Chaotic,
     Poisson
@@ -515,12 +515,14 @@ public class Simulation(double workerProcessingTime, double simulationDuration, 
 
     private double _previousError = 0;
     private double _integralTerm = 0;
+    private double _timeBelowZero = 0;
 
     private readonly int _maxWorkers = maxWorkers;
     private readonly int _workerRemovalBackoffMs = 5 * (int)simulationRemovalPeriod;
     private readonly double _workerProcessingTime = workerProcessingTime;
     private readonly double _simulationDuration = simulationDuration;
     private readonly double _simulationTimeStep = simulationTimeStep;
+    private readonly double _timeBelowZeroHysteresis = 10 * simulationTimeStep;
     private readonly double _simulationRemovalPeriod = simulationRemovalPeriod;
 
     private readonly List<Worker> _workers = [];
@@ -599,12 +601,22 @@ public class Simulation(double workerProcessingTime, double simulationDuration, 
         {
             if (controlSignal < 0)
             {
-                var workerToRemove = _workers.LastOrDefault(w => w.IsInactive);
-                if (workerToRemove != null)
+                _timeBelowZero += simulationTimeStep;
+                if (_timeBelowZero > _timeBelowZeroHysteresis)
                 {
-                    _workers.Remove(workerToRemove);
-                    _lastWorkerRemovalTime = DateTime.UtcNow;
+                    var workerToRemove = _workers.LastOrDefault(w => w.IsInactive);
+                    if (workerToRemove != null)
+                    {
+                        _workers.Remove(workerToRemove);
+                        _lastWorkerRemovalTime = DateTime.UtcNow;
+                    }
+
+                    _timeBelowZero = 0;
                 }
+            }
+            else
+            {
+                _timeBelowZero = 0;
             }
         }
     }
