@@ -615,8 +615,9 @@ public class Simulation(
 
                         _workers.Remove(workerToRemove);
 
-                        _integralTerm = 0;
-                        _previousError = 0;
+                        double antiWindUpFactor = (double)(inactiveWorkers.Length - 1) / inactiveWorkers.Length;
+                        
+                        _integralTerm *= antiWindUpFactor;
                         _lastWorkerRemovalTime = DateTime.UtcNow;
                     }
 
