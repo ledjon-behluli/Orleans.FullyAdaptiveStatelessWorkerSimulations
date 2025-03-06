@@ -1,4 +1,5 @@
 ﻿using ScottPlot;
+using System.Collections.Immutable;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -607,10 +608,15 @@ public class Simulation(
                 _timesBelowZeroCount++;
                 if (_timesBelowZeroCount > _timesBelowZeroMaxCount)
                 {
-                    var workerToRemove = _workers.LastOrDefault(w => w.IsInactive);
-                    if (workerToRemove != null)
+                    var inactiveWorkers = _workers.Where(w => w.IsInactive).ToImmutableArray();
+                    if (inactiveWorkers.Length > 0)
                     {
+                        var workerToRemove = inactiveWorkers[Random.Shared.Next(inactiveWorkers.Length)];
+
                         _workers.Remove(workerToRemove);
+
+                        _integralTerm = 0;
+                        _previousError = 0;
                         _lastWorkerRemovalTime = DateTime.UtcNow;
                     }
 
